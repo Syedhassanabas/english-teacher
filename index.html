@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI English Teacher</title>
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--tx:#1f2328;--mut:#6b7280;--ac:#4f46e5;--acx:#fff;--bd:#e5e7eb;--me:#4f46e5;--mex:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15161a;--card:#1f2127;--tx:#eceef2;--mut:#9aa1ad;--bd:#2d3038}}
+:root[data-theme="dark"]{--bg:#15161a;--card:#1f2127;--tx:#eceef2;--mut:#9aa1ad;--bd:#2d3038}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{padding:12px 16px;border-bottom:1px solid var(--bd);background:var(--card)}
+h1{font-size:18px;margin:0 0 8px}
+.modes{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.modes button{white-space:nowrap;border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:999px;padding:9px 16px;font-size:15px;cursor:pointer}
+.modes button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+#chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;max-width:760px;width:100%;margin:0 auto}
+.m{max-width:88%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.m.ai{background:var(--card);border:1px solid var(--bd);align-self:flex-start}
+.m.me{background:var(--me);color:var(--mex);align-self:flex-end}
+.m .sp{display:inline-block;margin-top:8px;border:1px solid var(--bd);background:none;color:var(--mut);cursor:pointer;font-size:14px;padding:4px 12px;border-radius:999px}
+.quick{display:flex;flex-wrap:wrap;gap:6px}
+.quick button{border:1px solid var(--ac);background:var(--card);color:var(--ac);border-radius:999px;padding:9px 14px;font-size:15px;font-weight:500;cursor:pointer}
+footer{border-top:1px solid var(--bd);background:var(--card);padding:10px 12px}
+.row{display:flex;gap:8px;max-width:760px;margin:0 auto}
+textarea{flex:1;resize:none;border:1px solid var(--bd);background:var(--bg);color:var(--tx);border-radius:12px;padding:10px 12px;font:inherit;max-height:120px}
+.row button{border:0;border-radius:12px;padding:0 20px;min-height:46px;font-size:16px;font-weight:600;cursor:pointer;background:var(--ac);color:var(--acx)}
+.row button.mic{background:var(--bg);color:var(--tx);border:1px solid var(--bd);font-size:18px}
+.row button:disabled{opacity:.5}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎓 AI English Teacher</h1>
+  <div class="modes" id="modes"></div>
+</header>
+<div id="chat"></div>
+<footer>
+  <div class="row">
+    <button class="mic" id="mic" title="Bol kar likhiye" hidden>🎤</button>
+    <textarea id="inp" rows="1" placeholder="English ya Hindi mein likhiye..."></textarea>
+    <button id="send">Bhejo ➤</button>
+  </div>
+</footer>
+<script>
+const MODES = {
+  chat:{label:"💬 Speaking Practice",intro:"Hello! 👋 I'm your English teacher. Let's chat in English. Tell me about your day, and I'll gently fix your mistakes.\n\nNamaste! Aap English mein kuch bhi likhiye, main sahi karke samjhaunga.",
+    quick:["Let me introduce myself","I want to practice job interview","Ask me a question"],
+    rule:"Mode: conversation practice. Reply to what the learner says naturally in simple English, If their sentence has a mistake, show '✅ Correct: ...' and explain it in ONE line of Hinglish, then ask ONE follow-up question to continue."},
+  grammar:{label:"✍️ Grammar Check",intro:"Koi bhi English sentence ya paragraph bhejiye. Main mistakes dhundh kar sahi version aur reason bataunga.",
+    quick:["I am going to market yesterday","She don't like tea","He have two brother"],
+    rule:"Mode: grammar checker. For the text given, reply with: ❌ Original, ✅ Corrected, then explain only the main mistake in ONE line of Hinglish. Then ask the learner to try one new sentence using the same rule."},
+  lesson:{label:"📚 Lessons",intro:"Kaunsa topic seekhna hai? Jaise Tenses, Articles, Prepositions, Modals, Active-Passive...",
+    quick:["Present Perfect tense","Articles a/an/the","Prepositions in/on/at","Modal verbs"],
+    rule:"Mode: lesson. Teach ONE small step at a time in simple Hinglish: a 1-line rule plus 1-2 example sentences, then ask ONE quick practice question. Wait for the learner's answer before moving to the next step."},
+  vocab:{label:"🔤 Vocabulary",intro:"Roz naye words seekhiye! 'Give me 5 words' likhiye ya koi word puchhiye.",
+    quick:["Give me 5 new words","Meaning of 'reluctant'","Words for interview"],
+    rule:"Mode: vocabulary. Give at most 2 words at a time. For each: Hindi meaning and one example sentence in one line. Then ask the learner to make their own sentence with the word."},
+  translate:{label:"🔁 Hindi → English",intro:"Hindi (ya Hinglish) mein likhiye, main natural English mein bataunga.",
+    quick:["Mujhe kal office jaana hai","Aap kaise hain?","Mera phone kho gaya hai"],
+    rule:"Mode: translator-teacher. Translate the learner's Hindi/Hinglish into natural English, give a more formal alternative, and explain the key point in ONE line of Hinglish. Then give a new Hindi sentence for the learner to translate."}
+};
+const BASE = "You are a warm, patient AI English teacher for Indian Hindi-speaking learners (beginner to intermediate). Use simple English. Explain in Hinglish (Hindi written in Roman letters) when teaching. Be encouraging. KEEP EVERY REPLY VERY SHORT: maximum 3-4 short lines (under 50 words). Give only the most important point, never a long explanation. ALWAYS end with exactly ONE short follow-up question or next step (in simple English/Hinglish) so the learner keeps going, like a real teacher in a live class. Never shame mistakes. Use light formatting: emojis sparingly, no markdown headers or tables. ";
+let mode="chat", hist=[], busy=false, sample=null;
+const $=id=>document.getElementById(id), chat=$("chat"), inp=$("inp");
+
+function add(role,text){
+  const d=document.createElement("div"); d.className="m "+role; d.textContent=text; chat.appendChild(d);
+  if(role==="ai"&&window.speechSynthesis){const b=document.createElement("button");b.className="sp";b.textContent="🔊 Suno";b.onclick=()=>speak(d.firstChild.textContent);d.appendChild(b);}
+  chat.scrollTop=chat.scrollHeight; return d;
+}
+function chips(){
+  document.querySelectorAll(".quick.next").forEach(e=>e.remove());
+  const q=document.createElement("div"); q.className="quick next";
+  [["➡️ Aage","Continue / next please"],["🇮🇳 Hindi mein samjhao","Please explain that again in simple Hindi"],["📝 Example","Give me one more easy example"],["🔁 Phir se","Ask me another one"]].forEach(([l,t])=>{const b=document.createElement("button");b.textContent=l;b.onclick=()=>send(t);q.appendChild(b)});
+  chat.appendChild(q); chat.scrollTop=chat.scrollHeight;
+}
+function speak(t){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[^\x00-\x7F]/g,""));u.lang="en-IN";speechSynthesis.speak(u);}catch(e){}}
+function setMode(m){
+  mode=m; hist=[]; chat.innerHTML="";
+  document.querySelectorAll(".modes button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));
+  add("ai",MODES[m].intro);
+  const q=document.createElement("div"); q.className="quick";
+  MODES[m].quick.forEach(t=>{const b=document.createElement("button");b.textContent=t;b.onclick=()=>{q.remove();send(t)};q.appendChild(b)});
+  chat.appendChild(q);
+}
+async function send(text){
+  text=(text??inp.value).trim(); if(!text||busy) return;
+  inp.value=""; inp.style.height="auto";
+  document.querySelectorAll(".quick").forEach(e=>e.remove()); add("me",text); hist.push({role:"user",content:text});
+  busy=true; $("send").disabled=true;
+  const bubble=add("ai","✍️ Likh raha hoon...");
+  try{
+    const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode,messages:hist.slice(-8)})});
+    const j=await res.json(); if(!res.ok) throw {code:res.status===429?"rate_limited":"err"};
+    const r={text:j.text};
+    bubble.firstChild.textContent=r.text; hist.push({role:"assistant",content:r.text}); chips();
+  }catch(e){
+    bubble.firstChild.textContent=e&&e.code==="rate_limited"?"Thoda ruk kar phir try kijiye.":"Kuch gadbad ho gayi. Dobara try kijiye.";
+    hist.pop();
+  }
+  busy=false; $("send").disabled=false; inp.focus();
+}
+Object.entries(MODES).forEach(([k,v])=>{const b=document.createElement("button");b.textContent=v.label;b.dataset.m=k;b.onclick=()=>setMode(k);$("modes").appendChild(b)});
+$("send").onclick=()=>send();
+inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
+inp.addEventListener("input",()=>{inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,120)+"px"});
+// voice input
+try{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(SR){const mic=$("mic");mic.hidden=false;mic.onclick=()=>{const r=new SR();r.lang="en-IN";r.onresult=e=>{send(e.results[0][0].transcript)};r.onstart=()=>{mic.textContent="🔴"};r.onend=()=>{mic.textContent="🎤"};r.onerror=()=>{};r.start();}}}catch(e){}
+setMode("chat");
+
+</script>
+</body>
+</html>
